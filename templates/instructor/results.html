@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}My Results — ENG 101{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">My Calibration Results</h4>
+    <p class="text-muted mb-0">{{ session.user_name }}</p>
+  </div>
+  <a href="{{ url_for('instructor_dashboard') }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Dashboard
+  </a>
+</div>
+
+<!-- Summary strip -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="fs-2 fw-bold text-primary">{{ overall_my_mean }}</div>
+      <div class="small text-muted">My mean score</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="fs-2 fw-bold text-secondary">{{ group_overall_mean }}</div>
+      <div class="small text-muted">Group mean</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      {% set leniency_color = 'warning' if leniency > 1 else ('danger' if leniency < -1 else 'success') %}
+      <div class="fs-2 fw-bold text-{{ leniency_color }}">
+        {{ '+' if leniency > 0 else '' }}{{ leniency }}
+      </div>
+      <div class="small text-muted">Leniency index</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      {% if tendency == 'Calibrated' %}
+        <div class="fs-5 fw-bold text-success"><i class="bi bi-check-circle-fill me-1"></i>Calibrated</div>
+      {% elif tendency == 'Lenient' %}
+        <div class="fs-5 fw-bold text-warning"><i class="bi bi-arrow-up-circle-fill me-1"></i>Lenient</div>
+      {% else %}
+        <div class="fs-5 fw-bold text-danger"><i class="bi bi-arrow-down-circle-fill me-1"></i>Harsh</div>
+      {% endif %}
+      <div class="small text-muted">Tendency</div>
+    </div>
+  </div>
+</div>
+
+<!-- Category leniency -->
+<div class="card mb-4">
+  <div class="card-header-brand">Category Breakdown</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Category</th>
+            <th class="text-center">My Mean</th>
+            <th class="text-center">Group Mean</th>
+            <th class="text-center">Leniency</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cat in categories %}
+          {% set my_m = my_cat_means.get(cat) %}
+          {% set grp_m = group_cat_means.get(cat) %}
+          {% set len_v = cat_leniency.get(cat) %}
+          <tr>
+            <td>{{ category_labels[cat] }}</td>
+            <td class="text-center">{{ my_m if my_m is not none else '—' }}</td>
+            <td class="text-center">{{ grp_m if grp_m is not none else '—' }}</td>
+            <td class="text-center">
+              {% if len_v is not none %}
+                {% if len_v > 0.5 %}
+                  <span class="badge bg-warning text-dark">+{{ len_v }}</span>
+                {% elif len_v < -0.5 %}
+                  <span class="badge bg-danger">{{ len_v }}</span>
+                {% else %}
+                  <span class="badge bg-success">{{ len_v }}</span>
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Per-sample results -->
+<h5 class="fw-bold mb-3">Results by Sample</h5>
+{% for r in results %}
+<div class="card mb-3">
+  <div class="card-body p-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="fw-semibold">Sample #{{ loop.index }}</span>
+      <div class="d-flex gap-2 align-items-center">
+        {% if r.certainty %}
+        <span class="badge bg-light text-muted border" title="Certainty">
+          <i class="bi bi-shield-check me-1"></i>Certainty: {{ r.certainty }}/5
+        </span>
+        {% endif %}
+        <span class="badge bg-light text-dark border">My score: <strong>{{ r.my_total }}</strong></span>
+        <span class="badge bg-light text-dark border">Group mean: <strong>{{ r.group_mean }}</strong></span>
+        {% if r.gs_total is not none %}
+        <span class="badge bg-primary">Std. score: {{ r.gs_total }}</span>
+        {% endif %}
+        {% set dev = r.deviation %}
+        {% if dev > 1 %}
+          <span class="badge bg-warning text-dark">+{{ dev }} lenient</span>
+        {% elif dev < -1 %}
+          <span class="badge bg-danger">{{ dev }} harsh</span>
+        {% else %}
+          <span class="badge bg-success">{{ dev }} on target</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-borderless mb-0" style="font-size:.85rem;">
+        <thead class="text-muted">
+          <tr>
+            <th>Category</th>
+            <th class="text-center">Mine</th>
+            <th class="text-center">Group mean</th>
+            {% if r.gs_total is not none %}<th class="text-center">Std. score</th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for pc in r.per_cat %}
+          <tr>
+            <td>{{ pc.label }}</td>
+            <td class="text-center fw-semibold">{{ pc.my }}</td>
+            <td class="text-center text-muted">{{ pc.group_mean if pc.group_mean is not none else '—' }}</td>
+            {% if r.gs_total is not none %}
+            <td class="text-center">{{ pc.gs if pc.gs is not none else '—' }}</td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}

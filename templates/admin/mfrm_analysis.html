@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+{% block title %}Many-Facet Rasch Analysis — Admin{% endblock %}
+
+{% block extra_style %}
+.logit-scale {
+  border-left: 3px solid #1a3a6b;
+  padding-left: 1rem;
+  margin-left: 1rem;
+  position: relative;
+}
+.logit-tick {
+  position: relative;
+  padding: .2rem 0;
+  font-size: .78rem;
+  color: #6c757d;
+}
+.logit-tick::before {
+  content: '';
+  position: absolute;
+  left: -1.3rem;
+  top: 50%;
+  width: .6rem;
+  height: 2px;
+  background: #6c757d;
+}
+.facet-chip {
+  display: inline-block;
+  border-radius: 4px;
+  padding: .1rem .5rem;
+  font-size: .78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chip-essay  { background: #dbeafe; color: #1e40af; }
+.chip-rater  { background: #fef9c3; color: #854d0e; }
+.chip-harsh  { background: #fee2e2; color: #991b1b; }
+.chip-lenient{ background: #dcfce7; color: #166534; }
+.chip-calib  { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+.msq-ok      { color: #166534; font-weight: 600; }
+.msq-marginal{ color: #854d0e; font-weight: 600; }
+.msq-bad     { color: #991b1b; font-weight: 700; }
+.sep-badge   {
+  font-size: 1.5rem; font-weight: 700;
+  display: block; margin-bottom: .2rem;
+}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">Many-Facet Rasch Model (MFRM)</h4>
+    <p class="text-muted mb-0 small">
+      2-Facet binomial Rasch model — Rater Severity × Essay Ability.<br>
+      Same methodology as TOEFL / IELTS performance assessment. Estimated by JMLE.
+    </p>
+  </div>
+  <a href="{{ url_for('export_excel') }}" class="btn btn-success btn-sm">
+    <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+  </a>
+</div>
+
+{% if not mfrm %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-diagram-3 fs-1"></i>
+    <p class="mt-3 mb-1">Not enough data to fit the MFRM.</p>
+    <p class="small">At least 2 raters and 2 scored essays are required.</p>
+  </div>
+</div>
+
+{% else %}
+
+{# ── Convergence notice ─────────────────────────────────────────────────── #}
+{% if not mfrm.converged %}
+<div class="alert alert-warning py-2 small mb-3">
+  <i class="bi bi-exclamation-triangle me-2"></i>
+  JMLE did not fully converge in {{ mfrm.iterations }} iterations. Measures are approximate.
+  Results will stabilise as more scores are collected.
+</div>
+{% endif %}
+
+{# ── Separation & Reliability summary ───────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  {% macro sep_card(title, sep, rel, icon, facet_desc) %}
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header-brand">{{ icon }} {{ title }}</div>
+      <div class="card-body">
+        <div class="row g-3 text-center">
+          <div class="col-6">
+            <span class="sep-badge
+              {{ 'text-success' if sep and sep >= 2 else ('text-warning' if sep and sep >= 1 else 'text-danger') }}">
+              {{ sep if sep else '—' }}
+            </span>
+            <div class="small text-muted">Separation Index (G)</div>
+            <div class="small mt-1">
+              {% if sep %}
+                {% if sep >= 3 %}
+                <span class="badge bg-success">Excellent (≥3)</span>
+                {% elif sep >= 2 %}
+                <span class="badge bg-primary">Good (≥2)</span>
+                {% elif sep >= 1 %}
+                <span class="badge bg-warning text-dark">Marginal (≥1)</span>
+                {% else %}
+                <span class="badge bg-danger">Poor (&lt;1)</span>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-6">
+            <span class="sep-badge
+              {{ 'text-success' if rel and rel >= 0.8 else ('text-warning' if rel and rel >= 0.6 else 'text-danger') }}">
+              {{ rel if rel else '—' }}
+            </span>
+            <div class="small text-muted">Reliability</div>
+            <div class="small mt-1">
+              {% if rel %}
+                {% if rel >= 0.9 %}
+                <span class="badge bg-success">Excellent (≥.90)</span>
+                {% elif rel >= 0.8 %}
+                <span class="badge bg-primary">Good (≥.80)</span>
+                {% elif rel >= 0.6 %}
+                <span class="badge bg-warning text-dark">Acceptable (≥.60)</span>
+                {% else %}
+                <span class="badge bg-danger">Poor (&lt;.60)</span>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <p class="small text-muted mt-3 mb-0">{{ facet_desc }}</p>
+      </div>
+    </div>
+  </div>
+  {% endmacro %}
+
+  {{ sep_card(
+      "Rater Facet",
+      mfrm.rater_sep, mfrm.rater_rel,
+      "⚖️",
+      "How reliably rater severity levels are separated. G ≥ 2 means at least 3 distinct severity groups are detectable."
+  ) }}
+  {{ sep_card(
+      "Essay Facet",
+      mfrm.essay_sep, mfrm.essay_rel,
+      "📄",
+      "How reliably essay difficulty levels are separated. G ≥ 2 means at least 3 distinct quality groups are detectable."
+  ) }}
+</div>
+
+{# ── Rater severity table ───────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header-brand">
+    ⚖️ Rater Severity Measures
+    <span class="badge bg-light text-muted ms-2" style="font-size:.75rem;">sorted harshest → most lenient</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Rater</th>
+            <th class="text-center">Measure<br><span class="fw-normal text-muted" style="font-size:.75rem;">(logits)</span></th>
+            <th class="text-center">SE</th>
+            <th class="text-center">95% CI</th>
+            <th class="text-center">Infit MSQ</th>
+            <th class="text-center">Outfit MSQ</th>
+            <th class="text-center">Severity</th>
+            <th class="text-center">Fit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set sorted_raters = mfrm.rater_ids | sort(attribute=lambda r: mfrm.rater_results[r].measure, reverse=True) if false else mfrm.rater_ids %}
+          {% set rater_list = [] %}
+          {% for rid in mfrm.rater_ids %}
+            {% if rater_list.append((mfrm.rater_results[rid].measure, rid)) %}{% endif %}
+          {% endfor %}
+
+          {# Sort by measure descending (harshest first) #}
+          {% set sorted_pairs = mfrm.rater_results.items() | list | sort(attribute='1.measure', reverse=True) %}
+
+          {% for rid, r in sorted_pairs %}
+          {% set instr = instr_map.get(rid) %}
+          <tr>
+            <td>
+              <strong>{{ instr.name if instr else rid }}</strong>
+              {% if instr and instr.bilkent_id %}
+              <span class="text-muted small ms-1">{{ instr.bilkent_id }}</span>
+              {% endif %}
+            </td>
+            <td class="text-center fw-bold
+              {{ 'text-danger' if r.measure > 0.5 else ('text-success' if r.measure < -0.5 else 'text-dark') }}">
+              {{ '+' if r.measure > 0 else '' }}{{ r.measure }}
+            </td>
+            <td class="text-center text-muted small">{{ r.se if r.se else '—' }}</td>
+            <td class="text-center text-muted small">
+              {% if r.ci_lo is not none and r.ci_hi is not none %}
+              [{{ r.ci_lo }}, {{ r.ci_hi }}]
+              {% else %}—{% endif %}
+            </td>
+
+            {# Infit MSQ #}
+            <td class="text-center">
+              {% if r.infit_msq is not none %}
+              <span class="{{ 'msq-ok' if r.infit_flag == 'acceptable' else ('msq-marginal' if r.infit_flag == 'marginal' else 'msq-bad') }}">
+                {{ r.infit_msq }}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+
+            {# Outfit MSQ #}
+            <td class="text-center">
+              {% if r.outfit_msq is not none %}
+              {% set out_flag = 'acceptable' if r.outfit_msq <= 1.3 else ('marginal' if r.outfit_msq <= 1.5 else 'underfit') %}
+              {% set out_flag = 'overfit' if r.outfit_msq is not none and r.outfit_msq < 0.5 else out_flag %}
+              <span class="{{ 'msq-ok' if out_flag == 'acceptable' else ('msq-marginal' if out_flag == 'marginal' else 'msq-bad') }}">
+                {{ r.outfit_msq }}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+
+            {# Severity badge #}
+            <td class="text-center">
+              {% if r.severity == 'harsh' %}
+              <span class="facet-chip chip-harsh">Harsh</span>
+              {% elif r.severity == 'lenient' %}
+              <span class="facet-chip chip-lenient">Lenient</span>
+              {% else %}
+              <span class="facet-chip chip-calib">Calibrated</span>
+              {% endif %}
+            </td>
+
+            {# Fit flag #}
+            <td class="text-center">
+              {% if r.infit_flag == 'acceptable' %}
+              <i class="bi bi-check-circle-fill text-success" title="Acceptable fit"></i>
+              {% elif r.infit_flag == 'marginal' %}
+              <i class="bi bi-exclamation-circle-fill text-warning" title="Marginal fit — monitor"></i>
+              {% elif r.infit_flag == 'underfit' %}
+              <i class="bi bi-x-circle-fill text-danger" title="Underfit — rater is inconsistent"></i>
+              {% elif r.infit_flag == 'overfit' %}
+              <i class="bi bi-exclamation-diamond-fill text-info" title="Overfit — rater may be cloning"></i>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted small py-2">
+    <strong>Measure:</strong> Rasch logit. Positive = harsher than average; negative = more lenient.
+    Convention: mean rater severity = 0 (defines scale origin).
+    <strong>Infit/Outfit MSQ:</strong> 0.5–1.3 acceptable; &gt;1.5 underfit; &lt;0.5 overfit.
+  </div>
+</div>
+
+{# ── Essay difficulty table ──────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header-brand">
+    📄 Essay Difficulty & Fair Average Scores
+    <span class="badge bg-light text-muted ms-2" style="font-size:.75rem;">sorted most difficult → easiest</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Sample</th>
+            <th class="text-center">Measure<br><span class="fw-normal text-muted" style="font-size:.75rem;">(logits)</span></th>
+            <th class="text-center">SE</th>
+            <th class="text-center">Observed Mean<br><span class="fw-normal text-muted" style="font-size:.75rem;">(/{{ max_total }})</span></th>
+            <th class="text-center">Fair Score<br><span class="fw-normal text-muted" style="font-size:.75rem;">(/{{ max_total }})</span></th>
+            <th class="text-center">Δ Fair</th>
+            <th class="text-center">Infit MSQ</th>
+            <th class="text-center">Fit</th>
+            <th class="text-center">Raters</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set sorted_essay_pairs = mfrm.essay_results.items() | list | sort(attribute='1.measure', reverse=True) %}
+          {% for eid, e in sorted_essay_pairs %}
+          {% set essay = essay_map.get(eid) %}
+          {% set delta = (e.fair_score - e.obs_mean) | round(2) if e.obs_mean is not none else none %}
+          <tr>
+            <td><span class="badge bg-secondary">{{ essay.essay_number if essay else eid }}</span></td>
+            <td class="small">{{ essay.title if essay else eid }}</td>
+            <td class="text-center fw-bold
+              {{ 'text-success' if e.measure > 0.5 else ('text-danger' if e.measure < -0.5 else 'text-dark') }}">
+              {{ '+' if e.measure > 0 else '' }}{{ e.measure }}
+            </td>
+            <td class="text-center text-muted small">{{ e.se if e.se else '—' }}</td>
+            <td class="text-center">{{ e.obs_mean }}</td>
+            <td class="text-center fw-bold text-primary">{{ e.fair_score }}</td>
+            <td class="text-center small">
+              {% if delta is not none %}
+              <span class="{{ 'text-success' if delta > 0 else ('text-danger' if delta < 0 else 'text-muted') }}">
+                {{ '+' if delta > 0 else '' }}{{ delta }}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              {% if e.infit_msq is not none %}
+              <span class="{{ 'msq-ok' if e.infit_flag == 'acceptable' else ('msq-marginal' if e.infit_flag == 'marginal' else 'msq-bad') }}">
+                {{ e.infit_msq }}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">
+              {% if e.infit_flag == 'acceptable' %}
+              <i class="bi bi-check-circle-fill text-success"></i>
+              {% elif e.infit_flag == 'marginal' %}
+              <i class="bi bi-exclamation-circle-fill text-warning"></i>
+              {% elif e.infit_flag == 'underfit' %}
+              <i class="bi bi-x-circle-fill text-danger" title="Scored inconsistently across raters"></i>
+              {% elif e.infit_flag == 'overfit' %}
+              <i class="bi bi-exclamation-diamond-fill text-info"></i>
+              {% else %}<span class="text-muted">—</span>{% endif %}
+            </td>
+            <td class="text-center text-muted small">{{ e.n_raters }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer text-muted small py-2">
+    <strong>Measure:</strong> Essay ability in logits. Higher = higher quality essay.
+    <strong>Fair Score:</strong> Expected score from a rater of average severity — removes rater effects for fairer comparison.
+    <strong>Δ Fair:</strong> Fair score minus observed mean (positive = essay was scored by harsher-than-average raters).
+  </div>
+</div>
+
+{# ── Wright Map ──────────────────────────────────────────────────────────── #}
+<div class="card mb-4">
+  <div class="card-header-brand">Wright Map — Both Facets on the Same Logit Scale</div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-2 text-center text-muted small fw-semibold pt-2">
+        <div>Logit</div>
+        <div>scale</div>
+      </div>
+      <div class="col-md-5">
+        <div class="text-center fw-semibold mb-2 small">📄 Essays (ability)</div>
+        {% set all_measures = [] %}
+        {% for eid, e in mfrm.essay_results.items() %}{% if all_measures.append(e.measure) %}{% endif %}{% endfor %}
+        {% for rid, r in mfrm.rater_results.items() %}{% if all_measures.append(r.measure) %}{% endif %}{% endfor %}
+        {% set scale_min = -3 %}
+        {% set scale_max = 3 %}
+
+        {# Generate logit ticks #}
+        {% for tick in [-3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3] %}
+        <div style="display:flex; align-items:center; min-height:28px; border-bottom:1px dashed #e9ecef; padding:2px 0;">
+          <span class="text-muted" style="width:32px; font-size:.72rem; text-align:right; padding-right:6px;">{{ tick }}</span>
+          <div style="flex:1; padding-left:4px;">
+            {% for eid, e in mfrm.essay_results.items() %}
+            {% if e.measure | round(1) == tick %}
+            {% set essay = essay_map.get(eid) %}
+            <span class="facet-chip chip-essay me-1">
+              #{{ essay.essay_number if essay else eid }}
+            </span>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="col-md-5">
+        <div class="text-center fw-semibold mb-2 small">⚖️ Raters (severity)</div>
+        {% for tick in [-3, -2.5, -2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2, 2.5, 3] %}
+        <div style="display:flex; align-items:center; min-height:28px; border-bottom:1px dashed #e9ecef; padding:2px 0;">
+          <div style="flex:1; padding-right:4px; text-align:right;">
+            {% for rid, r in mfrm.rater_results.items() %}
+            {% if r.measure | round(1) == tick %}
+            {% set instr = instr_map.get(rid) %}
+            <span class="facet-chip ms-1
+              {{ 'chip-harsh' if r.severity == 'harsh' else ('chip-lenient' if r.severity == 'lenient' else 'chip-calib') }}">
+              {{ instr.name.split()[0] if instr else rid }}
+            </span>
+            {% endif %}
+            {% endfor %}
+          </div>
+          <span class="text-muted" style="width:32px; font-size:.72rem; text-align:left; padding-left:6px;">{{ tick }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <p class="text-muted small mt-3 mb-0 text-center">
+      Items above the 0 line on the left are above-average quality essays; items above 0 on the right are harsher-than-average raters.
+    </p>
+  </div>
+</div>
+
+{# ── Interpretation guide ────────────────────────────────────────────────── #}
+<div class="card">
+  <div class="card-header-brand">Reading the MFRM Report</div>
+  <div class="card-body">
+    <div class="row g-4">
+      <div class="col-md-6">
+        <h6 class="fw-semibold">Rater Severity (D measure)</h6>
+        <p class="small text-muted mb-2">
+          Expressed in <strong>logits</strong> (log-odds units).
+          The scale is centred so the mean rater severity = 0.
+        </p>
+        <ul class="small text-muted ps-3">
+          <li><strong>Positive logit</strong> — rater gives fewer points than average for the same essay (harsher). Example: D = +0.8 → roughly 10–15% lower scores than a calibrated rater.</li>
+          <li><strong>Negative logit</strong> — rater gives more points (more lenient).</li>
+          <li><strong>Near zero</strong> — rater is well calibrated with the group.</li>
+        </ul>
+        <h6 class="fw-semibold mt-3">Infit / Outfit MSQ</h6>
+        <ul class="small text-muted ps-3">
+          <li><strong>0.5–1.3</strong> — acceptable. Rater behaves as the model predicts.</li>
+          <li><strong>>1.3 (marginal), >1.5 (underfit)</strong> — rater is erratic; scores are less predictable than expected. May need calibration discussion.</li>
+          <li><strong>&lt;0.5 (overfit)</strong> — rater scores are suspiciously consistent; may be copying another rater's scores.</li>
+        </ul>
+      </div>
+      <div class="col-md-6">
+        <h6 class="fw-semibold">Essay Ability (B measure)</h6>
+        <ul class="small text-muted ps-3">
+          <li><strong>Higher logit</strong> — essay is higher quality and consistently scored higher.</li>
+          <li><strong>Lower logit</strong> — essay is weaker and scored lower across raters.</li>
+          <li><strong>High infit MSQ</strong> — raters disagreed more than expected on this essay. It may have unusual features worth discussing in calibration.</li>
+        </ul>
+        <h6 class="fw-semibold mt-3">Fair Score</h6>
+        <p class="small text-muted mb-2">
+          The score an essay would receive from a rater of <em>average</em> severity. It removes the accident of which rater happened to score which essay, making scores more comparable across the group.
+        </p>
+        <h6 class="fw-semibold">Separation & Reliability</h6>
+        <ul class="small text-muted ps-3">
+          <li><strong>Rater separation G ≥ 2</strong> — the instrument can detect at least 3 distinct severity groups among raters. Worth investigating in calibration.</li>
+          <li><strong>Rater reliability ≥ 0.80</strong> — severity estimates are stable and replicable.</li>
+          <li><strong>Essay separation G ≥ 2</strong> — essays represent at least 3 distinct quality levels (good for a representative sample set).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+
+<div class="text-muted small mt-3 text-center">
+  JMLE converged in {{ mfrm.iterations if mfrm else '—' }} iterations ({{ mfrm.n_essays if mfrm else 0 }} essays × {{ mfrm.n_raters if mfrm else 0 }} raters).
+  Model: binomial Rasch Rating Scale, logit(E[x]/m) = B_n − D_i.
+</div>
+{% endblock %}

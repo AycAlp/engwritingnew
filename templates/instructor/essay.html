@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% block title %}Sample {{ pos }} of {{ total }} — ENG 101{% endblock %}
+
+{% block extra_style %}
+/* ── Layout ──────────────────────────────────────────────────── */
+.scoring-layout {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 0;
+  height: calc(100vh - 58px);
+  overflow: hidden;
+}
+
+/* Essay panel — left */
+.essay-panel {
+  display: flex;
+  flex-direction: column;
+  background: #2b2b2b;
+  overflow: hidden;
+}
+.essay-toolbar {
+  background: #1a1a1a;
+  color: #eee;
+  padding: .55rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-shrink: 0;
+  font-size: .88rem;
+}
+.essay-toolbar .page-counter { margin-left: auto; opacity: .7; font-size: .82rem; }
+.essay-scroll {
+  overflow-y: auto;
+  flex: 1;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .75rem;
+}
+.essay-scroll img,
+.essay-scroll iframe {
+  max-width: 100%;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0,0,0,.4);
+}
+.essay-scroll iframe { width: 100%; min-height: 75vh; background: #fff; }
+
+/* Reading banner */
+.reading-bar {
+  background: #fff3cd;
+  border-bottom: 1px solid #ffc107;
+  padding: .5rem 1rem;
+  font-size: .88rem;
+  flex-shrink: 0;
+}
+
+/* Rubric panel — right */
+.rubric-panel {
+  background: #fff;
+  border-left: 1px solid #dee2e6;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.rubric-header {
+  background: #1a3a6b;
+  color: #fff;
+  padding: .75rem 1.1rem;
+  flex-shrink: 0;
+}
+.rubric-header h6 { margin: 0; font-size: .95rem; font-weight: 700; }
+.rubric-header .progress-text { font-size: .78rem; opacity: .8; }
+.rubric-scroll {
+  overflow-y: auto;
+  flex: 1;
+  padding: 1rem;
+}
+.rubric-footer {
+  border-top: 1px solid #dee2e6;
+  padding: .85rem 1rem;
+  flex-shrink: 0;
+  background: #f8f9fa;
+}
+
+/* Score total badge */
+.total-badge {
+  background: #1a3a6b;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: .35rem .8rem;
+  border-radius: 8px;
+  min-width: 70px;
+  text-align: center;
+}
+.total-badge.incomplete { background: #6c757d; }
+
+/* Category card */
+.cat-card {
+  border: 2px solid #dee2e6;
+  border-radius: 10px;
+  margin-bottom: .85rem;
+  overflow: hidden;
+  transition: border-color .15s;
+}
+.cat-card.scored { border-color: #1a3a6b; }
+.cat-card-header {
+  background: #f4f6fb;
+  padding: .55rem .85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cat-card-header .cat-name { font-weight: 600; font-size: .9rem; }
+.cat-card-header .cat-range { font-size: .78rem; color: #6c757d; }
+.cat-card-body { padding: .65rem .85rem; }
+
+/* Score buttons */
+.score-btns {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+.score-btn {
+  flex: 1;
+  min-width: 52px;
+  border: 2px solid #dee2e6;
+  background: #fff;
+  border-radius: 8px;
+  padding: .35rem .25rem;
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
+  line-height: 1.2;
+}
+.score-btn:hover { border-color: #1a3a6b; background: #f0f4fb; }
+.score-btn.active {
+  border-color: #1a3a6b;
+  background: #1a3a6b;
+  color: #fff;
+}
+.score-btn .num { font-size: 1.05rem; font-weight: 700; display: block; }
+.score-btn .lbl { font-size: .68rem; display: block; opacity: .85; }
+.score-btn.active .lbl { opacity: .9; }
+
+/* Certainty widget */
+.certainty-row {
+  display: flex;
+  gap: .4rem;
+}
+.certainty-btn {
+  flex: 1;
+  border: 2px solid #dee2e6;
+  background: #fff;
+  border-radius: 8px;
+  padding: .4rem .2rem;
+  cursor: pointer;
+  text-align: center;
+  font-size: .75rem;
+  transition: all .15s;
+  line-height: 1.3;
+}
+.certainty-btn:hover { border-color: #e8a020; background: #fff8ee; }
+.certainty-btn.active { border-color: #e8a020; background: #e8a020; color: #fff; }
+.certainty-btn .cnum { font-size: .95rem; font-weight: 700; display: block; }
+
+/* Mobile: tab layout */
+@media (max-width: 767px) {
+  .scoring-layout {
+    display: block;
+    height: auto;
+    overflow: visible;
+  }
+  .essay-panel, .rubric-panel {
+    height: auto;
+    overflow: visible;
+  }
+  .essay-scroll { max-height: 50vh; }
+  .rubric-scroll { max-height: none; overflow: visible; }
+  .rubric-panel { border-left: none; border-top: 3px solid #1a3a6b; }
+  .score-btn .lbl { font-size: .65rem; }
+}
+{% endblock %}
+
+{% block main_class %}p-0{% endblock %}
+
+{% block content %}
+<div class="scoring-layout">
+
+  <!-- ── LEFT: Essay panel ─────────────────────────────────────── -->
+  <div class="essay-panel">
+    <div class="essay-toolbar">
+      <i class="bi bi-file-text me-1"></i>
+      <strong>Sample {{ pos }} of {{ total }}</strong>
+
+      {% set task_text = (std.reading_task if std and std.reading_task else None) or essay.task_question %}
+      {% if task_text %}
+      <span class="d-none d-md-inline text-truncate" style="max-width:300px; opacity:.75;">
+        &mdash; {{ task_text }}
+      </span>
+      {% endif %}
+
+      {% set images_count = images | length %}
+      {% if images_count > 1 %}
+      <span class="page-counter">{{ images_count }} page{{ 's' if images_count > 1 }}</span>
+      {% endif %}
+    </div>
+
+    {% set task_text = (std.reading_task if std and std.reading_task else None) or essay.task_question %}
+    {% set reading_file = essay.reading_filename or (std.reading_filename if std else None) %}
+
+    {% if task_text %}
+    <div class="reading-bar d-flex align-items-start gap-2">
+      <i class="bi bi-question-circle-fill text-warning flex-shrink-0 mt-1"></i>
+      <div>
+        <strong class="d-block" style="font-size:.82rem; color:#856404;">Writing Task</strong>
+        <span style="color:#664d03;">{{ task_text }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if reading_file %}
+    <div class="reading-bar d-flex align-items-center gap-2" style="background:#e8f4fd; border-color:#0d6efd;">
+      <i class="bi bi-book-fill text-primary flex-shrink-0"></i>
+      <div>
+        <strong class="d-block" style="font-size:.82rem; color:#084298;">Assigned Reading</strong>
+        <a href="{{ url_for('essay_reading', filename=reading_file) }}"
+           target="_blank" class="small" style="color:#084298;">
+          Open assigned reading <i class="bi bi-box-arrow-up-right ms-1"></i>
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="essay-scroll">
+      {% for img in images %}
+        {% set ext = img.filename.rsplit('.', 1)[-1].lower() %}
+        {% if ext == 'pdf' %}
+        <iframe src="{{ url_for('essay_image', filename=img.filename) }}"
+                title="Essay page {{ img.page_number }}"></iframe>
+        {% else %}
+        <img src="{{ url_for('essay_image', filename=img.filename) }}"
+             alt="Essay page {{ img.page_number }}"
+             loading="lazy">
+        {% endif %}
+      {% endfor %}
+
+      {% if not images %}
+      <div class="text-muted text-center py-5">
+        <i class="bi bi-image" style="font-size:2rem;"></i>
+        <p class="mt-2">No images uploaded for this sample.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ── RIGHT: Rubric panel ─────────────────────────────────────── -->
+  <div class="rubric-panel">
+    <div class="rubric-header">
+      <div class="d-flex justify-content-between align-items-center">
+        <h6><i class="bi bi-list-check me-2"></i>Scoring Rubric</h6>
+        <span class="total-badge incomplete" id="totalBadge">— / {{ max_total }}</span>
+      </div>
+      <div class="progress mt-2" style="height:4px; border-radius:2px; background:rgba(255,255,255,.25);">
+        <div class="progress-bar bg-white" id="rubricProgress" style="width:0%; transition:width .3s;"></div>
+      </div>
+      <div class="progress-text mt-1" id="progressText">0 of {{ categories|length }} categories scored</div>
+    </div>
+
+    <div class="rubric-scroll">
+      <form method="post" id="scoringForm">
+
+        <!-- Category cards -->
+        {% for cat in categories %}
+        {% set scale = category_scales[cat] %}
+        {% set label = category_labels[cat] %}
+        {% set min_v = scale.min %}
+        {% set max_v = scale.max %}
+        {% set ex_val = existing.get(cat) if existing else None %}
+
+        <div class="cat-card {% if ex_val is not none %}scored{% endif %}" id="card-{{ cat }}">
+          <div class="cat-card-header">
+            <span class="cat-name">{{ label }}</span>
+            <span class="cat-range">{{ min_v }}–{{ max_v }} pts</span>
+          </div>
+          <div class="cat-card-body">
+            <div class="score-btns" role="group" aria-label="{{ label }} score">
+              {% for v in range(min_v, max_v + 1) %}
+              {% set is_active = (ex_val | string == v | string) if ex_val is not none else false %}
+              <button type="button"
+                      class="score-btn {% if is_active %}active{% endif %}"
+                      data-cat="{{ cat }}"
+                      data-value="{{ v }}"
+                      onclick="selectScore('{{ cat }}', {{ v }}, this)">
+                <span class="num">{{ v }}</span>
+                <span class="lbl">{{ scale.labels[v] }}</span>
+              </button>
+              {% endfor %}
+            </div>
+            <input type="hidden"
+                   name="{{ cat }}"
+                   id="input-{{ cat }}"
+                   value="{{ ex_val if ex_val is not none else '' }}">
+          </div>
+        </div>
+        {% endfor %}
+
+        <!-- Certainty -->
+        <div class="card border-warning mb-3">
+          <div class="card-body p-3">
+            <p class="fw-semibold mb-2" style="font-size:.9rem;">
+              <i class="bi bi-shield-check me-2 text-warning"></i>How certain are you of your overall score?
+            </p>
+            <div class="certainty-row">
+              {% for val in [1,2,3,4,5] %}
+              {% set is_active = (existing.get('certainty') | string == val | string) if existing else false %}
+              <button type="button"
+                      class="certainty-btn {% if is_active %}active{% endif %}"
+                      data-value="{{ val }}"
+                      onclick="selectCertainty({{ val }}, this)">
+                <span class="cnum">{{ val }}</span>
+                {{ certainty_labels[val] }}
+              </button>
+              {% endfor %}
+            </div>
+            <input type="hidden" name="certainty" id="input-certainty"
+                   value="{{ existing.get('certainty', '') if existing else '' }}">
+          </div>
+        </div>
+
+        <!-- Comments -->
+        <div class="mb-3">
+          <label for="comments" class="form-label fw-semibold" style="font-size:.9rem;">
+            <i class="bi bi-chat-left-text me-2"></i>Comments <span class="text-muted fw-normal">(optional)</span>
+          </label>
+          <textarea name="comments" id="comments" rows="3"
+                    class="form-control"
+                    placeholder="Notes about this sample…">{{ (existing.get('comments', '') or '') if existing else '' }}</textarea>
+        </div>
+
+        <div class="d-grid">
+          <button type="submit" class="btn btn-accent btn-lg" id="submitBtn" disabled>
+            <i class="bi bi-check2-all me-2"></i>Submit Score
+          </button>
+        </div>
+        <p class="text-muted small text-center mt-2 mb-0">
+          <i class="bi bi-lock me-1"></i>Scores cannot be edited after submission.
+        </p>
+
+      </form>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CATEGORIES = {{ categories | tojson }};
+const MAX_TOTAL  = {{ max_total }};
+const scores     = {};
+
+// Restore existing values if form had errors
+{% if existing %}
+{% for cat in categories %}
+{% if existing.get(cat) %}scores['{{ cat }}'] = {{ existing[cat] }};{% endif %}
+{% endfor %}
+{% endif %}
+
+function selectScore(cat, val, btn) {
+  // Deselect siblings
+  btn.closest('.score-btns').querySelectorAll('.score-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('input-' + cat).value = val;
+  scores[cat] = val;
+
+  // Mark card as scored
+  document.getElementById('card-' + cat).classList.add('scored');
+
+  updateTotal();
+}
+
+function selectCertainty(val, btn) {
+  document.querySelectorAll('.certainty-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('input-certainty').value = val;
+  checkReady();
+}
+
+function updateTotal() {
+  let total = 0;
+  let count = 0;
+  CATEGORIES.forEach(cat => {
+    if (scores[cat] !== undefined) { total += scores[cat]; count++; }
+  });
+
+  const badge = document.getElementById('totalBadge');
+  const prog  = document.getElementById('rubricProgress');
+  const txt   = document.getElementById('progressText');
+
+  badge.textContent = (count === CATEGORIES.length ? total : '—') + ' / ' + MAX_TOTAL;
+  badge.classList.toggle('incomplete', count < CATEGORIES.length);
+
+  const pct = (count / CATEGORIES.length) * 100;
+  prog.style.width = pct + '%';
+  txt.textContent  = count + ' of ' + CATEGORIES.length + ' categories scored';
+
+  checkReady();
+}
+
+function checkReady() {
+  const allCats     = CATEGORIES.every(cat => scores[cat] !== undefined);
+  const hasCertainty = document.getElementById('input-certainty').value !== '';
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = !(allCats && hasCertainty);
+}
+
+// Init state
+updateTotal();
+checkReady();
+</script>
+{% endblock %}
+                                                               

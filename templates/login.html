@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — ENG 101 Writing Standardization</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body {
+      background: #f0f4fb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(26,58,107,.15);
+      border: none;
+    }
+    .login-header {
+      background: #1a3a6b;
+      color: #fff;
+      border-radius: 14px 14px 0 0;
+      padding: 2rem 2rem 1.5rem;
+      text-align: center;
+    }
+    .login-header h1 { font-size: 1.3rem; font-weight: 700; margin-bottom: .25rem; }
+    .login-header p  { opacity: .8; font-size: .9rem; margin: 0; }
+    .login-body { padding: 2rem; }
+    .btn-login {
+      background: #1a3a6b;
+      color: #fff;
+      border: none;
+      width: 100%;
+      padding: .7rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 8px;
+    }
+    .btn-login:hover { background: #2a5298; color: #fff; }
+    .form-control:focus { border-color: #1a3a6b; box-shadow: 0 0 0 .2rem rgba(26,58,107,.2); }
+  </style>
+</head>
+<body>
+  <div class="login-card card">
+    <div class="login-header">
+      <i class="bi bi-pencil-square fs-2 mb-2 d-block"></i>
+      <h1>ENG 101 Writing Standardization</h1>
+      <p>Sign in with your email and password</p>
+    </div>
+    <div class="login-body">
+      {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for msg in messages %}
+        <div class="alert alert-danger py-2 small">{{ msg }}</div>
+        {% endfor %}
+      {% endif %}
+      {% endwith %}
+
+      <form method="post">
+        <div class="mb-3">
+          <label for="email" class="form-label fw-semibold">Email address</label>
+          <input type="email" class="form-control" id="email" name="email"
+                 required autofocus autocomplete="email" placeholder="you@university.edu">
+        </div>
+        <div class="mb-4">
+          <label for="password" class="form-label fw-semibold">Password</label>
+          <input type="password" class="form-control" id="password" name="password"
+                 required autocomplete="current-password" placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn btn-login">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Sign in
+        </button>
+      </form>
+
+      <p class="text-center text-muted small mt-4 mb-0">
+        Contact your administrator if you do not have an account or have forgotten your password.
+      </p>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

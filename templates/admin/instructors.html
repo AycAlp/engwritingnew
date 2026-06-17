@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% block title %}Instructors — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Instructors</h4>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addInstructorModal">
+      <i class="bi bi-person-plus me-1"></i>Add Instructor
+    </button>
+    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#csvModal">
+      <i class="bi bi-filetype-csv me-1"></i>CSV Upload
+    </button>
+  </div>
+</div>
+
+<!-- Instructor table -->
+{% if instructors %}
+<div class="card mb-4">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Bilkent ID</th>
+            <th class="text-center">Scored</th>
+            <th class="text-center">Done?</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for instr in instructors %}
+          {% set done = submission_counts.get(instr.id, 0) %}
+          <tr>
+            <td class="fw-semibold">{{ instr.name }}</td>
+            <td class="text-muted small">{{ instr.email }}</td>
+            <td>{{ instr.bilkent_id or '—' }}</td>
+            <td class="text-center">
+              {{ done }} / {{ total_essays }}
+              {% if total_essays > 0 %}
+              <div class="progress mt-1" style="height:4px;">
+                <div class="progress-bar bg-success"
+                     style="width:{{ (done / total_essays * 100)|int }}%"></div>
+              </div>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              {% if total_essays > 0 and done >= total_essays %}
+              <i class="bi bi-check-circle-fill text-success"></i>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <button class="btn btn-outline-secondary btn-sm me-1"
+                      data-bs-toggle="modal"
+                      data-bs-target="#resetPwModal{{ instr.id }}">
+                <i class="bi bi-key me-1"></i>Reset PW
+              </button>
+              <form method="post"
+                    action="{{ url_for('delete_instructor', user_id=instr.id) }}"
+                    class="d-inline"
+                    onsubmit="return confirm('Remove {{ instr.name }} and all their scores?')">
+                <button type="submit" class="btn btn-outline-danger btn-sm">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+
+          <!-- Reset password modal -->
+          <div class="modal fade" id="resetPwModal{{ instr.id }}" tabindex="-1">
+            <div class="modal-dialog modal-sm">
+              <div class="modal-content">
+                <div class="modal-header">
+                  <h6 class="modal-title">Reset password — {{ instr.name }}</h6>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="post">
+                  <input type="hidden" name="action" value="reset_password">
+                  <input type="hidden" name="user_id" value="{{ instr.id }}">
+                  <div class="modal-body">
+                    <label class="form-label">New password (min 6 chars)</label>
+                    <input type="text" name="new_password" class="form-control"
+                           required minlength="6" placeholder="New password">
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning btn-sm">Update password</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="card mb-4">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-people fs-1"></i>
+    <p class="mt-3">No instructors added yet.</p>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ── Add Instructor Modal ─────────────────────────────────────── -->
+<div class="modal fade" id="addInstructorModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add Instructor</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Full name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required placeholder="e.g. Ayca Alpman">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Email <span class="text-danger">*</span></label>
+            <input type="email" name="email" class="form-control" required placeholder="ayca@university.edu">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Password <span class="text-danger">*</span></label>
+            <input type="text" name="password" class="form-control" required minlength="6"
+                   placeholder="Minimum 6 characters">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Bilkent ID <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="text" name="bilkent_id" class="form-control" placeholder="e.g. B12345">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add instructor</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── CSV Upload Modal ─────────────────────────────────────────── -->
+<div class="modal fade" id="csvModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-filetype-csv me-2"></i>CSV Bulk Upload</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('admin_instructors_csv') }}" enctype="multipart/form-data">
+        <div class="modal-body">
+          <p class="small text-muted mb-3">
+            Required columns: <code>bilkent_id</code>, <code>name</code>, <code>email</code><br>
+            Optional column: <code>password</code> (a random password is generated if omitted)
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">CSV file</label>
+            <input type="file" name="csvfile" class="form-control" accept=".csv" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Import mode</label>
+            <select name="mode" class="form-select">
+              <option value="add_only">Add new only (never delete)</option>
+              <option value="remove_leavers">Add new + remove those not in CSV</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Import CSV</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Cross-Standardization Comparison{% endblock %}
+
+{% block extra_style %}
+.tend-lenient   { color: #856404; font-weight: 600; }
+.tend-harsh     { color: #842029; font-weight: 600; }
+.tend-calibrated{ color: #0f5132; font-weight: 600; }
+.std-header     { background: var(--brand); color: #fff; padding: .5rem .8rem; border-radius: 6px 6px 0 0; font-weight: 600; }
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h4 class="fw-bold mb-0">Cross-Standardization Comparison</h4>
+  <p class="text-muted mb-0">How individual instructors performed across all standardization sessions.</p>
+</div>
+
+{% if not data %}
+<div class="card text-center p-5 text-muted">
+  <i class="bi bi-bar-chart fs-1 mb-3"></i>
+  <p class="mb-0">No data yet. Scores must be submitted before comparison is possible.</p>
+</div>
+{% else %}
+
+<!-- Per-standardization tables -->
+{% for entry in data %}
+{% set std = entry.standardization %}
+<div class="card mb-4">
+  <div class="std-header d-flex justify-content-between align-items-center">
+    <span>
+      <i class="bi bi-folder2 me-2"></i>{{ std.name }}
+      <span class="badge {% if std.status == 'active' %}bg-success{% else %}bg-light text-dark{% endif %} ms-2">
+        {{ std.status | capitalize }}
+      </span>
+    </span>
+    <span class="small text-white-50">
+      {{ std.term or '' }}{% if std.term %} · {% endif %}{{ std.year }}
+      &nbsp;·&nbsp; {{ entry.essay_count }} sample{{ 's' if entry.essay_count != 1 else '' }}
+      &nbsp;·&nbsp; group mean: <strong>{{ entry.group_mean }}/22</strong>
+    </span>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Instructor</th>
+            <th>Bilkent ID</th>
+            <th class="text-center">Samples scored</th>
+            <th class="text-center">Mean total (/22)</th>
+            <th class="text-center">Leniency index</th>
+            <th class="text-center">Tendency</th>
+            <th class="text-center">Avg dist. from gold</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in entry.instructor_stats %}
+          <tr>
+            <td class="fw-semibold small">{{ s.name }}</td>
+            <td class="text-muted small">{{ s.bilkent_id or '—' }}</td>
+            <td class="text-center small">{{ s.essays_scored }}</td>
+            <td class="text-center small">{{ s.mean_total }}</td>
+            <td class="text-center small">
+              <span class="{% if s.leniency > 1 %}text-warning fw-semibold{% elif s.leniency < -1 %}text-danger fw-semibold{% else %}text-success{% endif %}">
+                {% if s.leniency > 0 %}+{% endif %}{{ s.leniency }}
+              </span>
+            </td>
+            <td class="text-center">
+              <span class="tend-{{ s.tendency | lower }}">{{ s.tendency }}</span>
+            </td>
+            <td class="text-center small">{{ s.avg_distance if s.avg_distance is not none else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- Instructor trajectory: leniency across standardizations -->
+{% set all_names = [] %}
+{% for entry in data %}
+  {% for s in entry.instructor_stats %}
+    {% if s.name not in all_names %}{% set _ = all_names.append(s.name) %}{% endif %}
+  {% endfor %}
+{% endfor %}
+
+{% if data | length > 1 %}
+<div class="card mt-2">
+  <div class="card-header-brand">Leniency Trajectory — across standardizations</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Instructor</th>
+            {% for entry in data %}
+            <th class="text-center" style="min-width:110px">
+              {{ entry.standardization.name | truncate(30) }}<br>
+              <span class="text-muted" style="font-size:.7rem">{{ entry.standardization.year }}</span>
+            </th>
+            {% endfor %}
+            <th class="text-center">Overall trend</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for name in all_names | sort %}
+          {% set leniencies = [] %}
+          {% for entry in data %}
+            {% set matched = entry.instructor_stats | selectattr('name', 'equalto', name) | list %}
+            {% if matched %}
+              {% set _ = leniencies.append(matched[0].leniency) %}
+            {% else %}
+              {% set _ = leniencies.append(none) %}
+            {% endif %}
+          {% endfor %}
+          <tr>
+            <td class="fw-semibold small">{{ name }}</td>
+            {% for val in leniencies %}
+            <td class="text-center small">
+              {% if val is not none %}
+              <span class="{% if val > 1 %}text-warning fw-semibold{% elif val < -1 %}text-danger fw-semibold{% else %}text-success{% endif %}">
+                {% if val > 0 %}+{% endif %}{{ val }}
+              </span>
+              {% else %}
+              <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            {% endfor %}
+            <td class="text-center small">
+              {% set vals = leniencies | reject('none') | list %}
+              {% if vals | length >= 2 %}
+                {% set first = vals[0] %}
+                {% set last = vals[-1] %}
+                {% set delta = (last - first) | round(2) %}
+                {% if delta > 0.5 %}
+                  <span class="text-warning"><i class="bi bi-arrow-up-right"></i> More lenient</span>
+                {% elif delta < -0.5 %}
+                  <span class="text-success"><i class="bi bi-arrow-down-right"></i> More calibrated</span>
+                {% else %}
+                  <span class="text-muted"><i class="bi bi-dash"></i> Stable</span>
+                {% endif %}
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

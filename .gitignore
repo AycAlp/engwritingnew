@@ -1,0 +1,44 @@
+# Database (never commit live data)
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded files (student essays, reading files)
+uploads/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Environment variables / secrets
+.env
+*.env
+secret_key.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Helper scripts (contain auth tokens)
+push-eng.sh

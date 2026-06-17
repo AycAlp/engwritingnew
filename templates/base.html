@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ENG 101 Writing Standardization{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #1a3a6b;
+      --brand-light: #2a5298;
+      --accent: #e8a020;
+      --surface: #f7f8fc;
+      --border: #dee2e6;
+    }
+
+    body {
+      background: var(--surface);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #1a1a2e;
+    }
+
+    .navbar-brand { font-weight: 700; letter-spacing: .3px; }
+
+    .navbar-dark.bg-brand {
+      background: var(--brand) !important;
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      font-weight: 600;
+    }
+    .btn-accent:hover { background: #c98a18; color: #fff; }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+
+    .card-header-brand {
+      background: var(--brand);
+      color: #fff;
+      border-radius: 10px 10px 0 0 !important;
+      padding: .8rem 1.2rem;
+      font-weight: 600;
+    }
+
+    .badge-calibrated { background: #198754; }
+    .badge-lenient    { background: #ffc107; color: #333; }
+    .badge-harsh      { background: #dc3545; }
+
+    .flash-container { position: sticky; top: 56px; z-index: 1040; }
+
+    /* Progress bar custom color */
+    .progress-bar.bg-brand { background: var(--brand-light) !important; }
+
+    {% block extra_style %}{% endblock %}
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-brand shadow-sm">
+  <div class="container-fluid px-3">
+    <a class="navbar-brand" href="#">
+      <i class="bi bi-pencil-square me-2"></i>ENG 101 Standardization
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarMain">
+      {% if session.get('user_role') == 'admin' %}
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_dashboard') }}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_standardizations') }}"><i class="bi bi-folder2 me-1"></i>Standardizations</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_essays') }}"><i class="bi bi-file-text me-1"></i>Samples</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_gold_standard') }}"><i class="bi bi-check2-circle me-1"></i>Standardized Scores</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('admin_instructors') }}"><i class="bi bi-people me-1"></i>Instructors</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('training') }}"><i class="bi bi-play-circle me-1"></i>Training</a></li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"><i class="bi bi-bar-chart me-1"></i>Analysis</a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{{ url_for('admin_sample_analysis') }}">Sample Analysis</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin_instructor_analysis') }}">Instructor Analysis</a></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin_mfrm') }}">
+              <i class="bi bi-diagram-3 me-1"></i>Many-Facet Rasch (MFRM)
+            </a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('admin_cross_standardization') }}">
+              <i class="bi bi-arrow-left-right me-1"></i>Cross-Standardization
+            </a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('export_excel') }}"><i class="bi bi-file-earmark-excel me-1"></i>Export Excel</a></li>
+          </ul>
+        </li>
+      </ul>
+      {% elif session.get('user_id') %}
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('instructor_dashboard') }}"><i class="bi bi-house me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('instructor_results') }}"><i class="bi bi-bar-chart me-1"></i>My Results</a></li>
+        <li class="nav-item"><a class="nav-link" href="{{ url_for('training') }}"><i class="bi bi-play-circle me-1"></i>Training</a></li>
+      </ul>
+      {% endif %}
+
+      {% if session.get('user_id') %}
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            <i class="bi bi-person-circle me-1"></i>{{ session.get('user_name', 'User') }}
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item text-danger" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-1"></i>Sign out</a></li>
+          </ul>
+        </li>
+      </ul>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+
+{% with messages = get_flashed_messages() %}
+{% if messages %}
+<div class="flash-container">
+  {% for msg in messages %}
+  <div class="alert alert-info alert-dismissible fade show mb-0 rounded-0 border-0 border-bottom" role="alert">
+    <i class="bi bi-info-circle me-2"></i>{{ msg }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<main class="{% block main_class %}container py-4{% endblock %}">
+  {% block content %}{% endblock %}
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

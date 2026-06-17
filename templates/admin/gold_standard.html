@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block title %}Standardized Scores — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">Standardized Score(s)</h4>
+    <p class="text-muted mb-0 small">Enter the agreed-upon scores and optional difficulty statistics for each sample.</p>
+  </div>
+</div>
+
+{% if not essays %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-file-earmark-x fs-1"></i>
+    <p class="mt-3">No samples have been added yet.</p>
+    <a href="{{ url_for('admin_essays') }}" class="btn btn-primary">Go to Samples</a>
+  </div>
+</div>
+{% else %}
+
+<!-- Sample selector -->
+<div class="row g-4">
+  <!-- Left: sample list -->
+  <div class="col-12 col-md-4">
+    <div class="card">
+      <div class="card-header-brand">Select a Sample</div>
+      <div class="list-group list-group-flush" id="sampleList">
+
+        {% for std in standardizations %}
+        {% set std_essays = essays_by_std.get(std.id, []) %}
+        {% if std_essays %}
+        <div class="list-group-item py-1 px-3 d-flex justify-content-between align-items-center"
+             style="background:#f0f4fb; border-left:3px solid #1a3a6b;">
+          <small class="fw-bold text-uppercase" style="color:#1a3a6b; font-size:.72rem; letter-spacing:.04em;">
+            {{ std.name }}
+          </small>
+          <small class="text-muted" style="font-size:.7rem;">{{ std.year }}{% if std.status == 'archived' %} · archived{% endif %}</small>
+        </div>
+        {% for essay in std_essays %}
+        {% set gs = gold_standards.get(essay.id) %}
+        <a href="#"
+           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ps-4"
+           data-essay-id="{{ essay.id }}"
+           onclick="showEssay({{ essay.id }}); return false;">
+          <span>
+            <span class="badge bg-secondary me-2">#{{ essay.essay_number }}</span>
+            {{ essay.title }}
+          </span>
+          {% if gs %}
+          <span class="badge bg-success">
+            <i class="bi bi-check-lg"></i>
+            {{ (gs.task_req or 0) + (gs.argument or 0) + (gs.support or 0) + (gs.language or 0) + (gs.readability or 0) + (gs.formatting or 0) }}
+          </span>
+          {% else %}
+          <span class="badge bg-light text-muted border">—</span>
+          {% endif %}
+        </a>
+        {% endfor %}
+        {% endif %}
+        {% endfor %}
+
+        {% set ungrouped = essays_by_std.get(none, []) %}
+        {% if ungrouped %}
+        <div class="list-group-item py-1 px-3"
+             style="background:#f8f9fa; border-left:3px solid #adb5bd;">
+          <small class="fw-bold text-uppercase text-muted" style="font-size:.72rem; letter-spacing:.04em;">Unassigned</small>
+        </div>
+        {% for essay in ungrouped %}
+        {% set gs = gold_standards.get(essay.id) %}
+        <a href="#"
+           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center ps-4"
+           data-essay-id="{{ essay.id }}"
+           onclick="showEssay({{ essay.id }}); return false;">
+          <span>
+            <span class="badge bg-secondary me-2">#{{ essay.essay_number }}</span>
+            {{ essay.title }}
+          </span>
+          {% if gs %}
+          <span class="badge bg-success">
+            <i class="bi bi-check-lg"></i>
+            {{ (gs.task_req or 0) + (gs.argument or 0) + (gs.support or 0) + (gs.language or 0) + (gs.readability or 0) + (gs.formatting or 0) }}
+          </span>
+          {% else %}
+          <span class="badge bg-light text-muted border">—</span>
+          {% endif %}
+        </a>
+        {% endfor %}
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: scoring form -->
+  <div class="col-12 col-md-8">
+    <div id="noSelection" class="card">
+      <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-arrow-left-circle fs-2"></i>
+        <p class="mt-2">Select a sample from the list to enter its standardized score.</p>
+      </div>
+    </div>
+
+    {% for essay in essays %}
+    {% set gs = gold_standards.get(essay.id) %}
+    <div id="form-{{ essay.id }}" class="d-none">
+      <div class="card">
+        <div class="card-header-brand">
+          Sample #{{ essay.essay_number }}: {{ essay.title }}
+        </div>
+        <div class="card-body">
+          {% if essay.task_question %}
+          <div class="alert alert-light border small mb-3">
+            <strong>Writing Task:</strong> {{ essay.task_question }}
+          </div>
+          {% endif %}
+
+          <form method="post">
+            <input type="hidden" name="essay_id" value="{{ essay.id }}">
+
+            <!-- Category scores -->
+            {% for cat in categories %}
+            {% set scale = category_scales[cat] %}
+            {% set gs_val = gs[cat] if gs else None %}
+            <div class="mb-3">
+              <label class="form-label fw-semibold">
+                {{ category_labels[cat] }}
+                <span class="text-muted fw-normal">({{ scale.min }}–{{ scale.max }})</span>
+              </label>
+              <div class="d-flex gap-2 flex-wrap">
+                {% for v in range(scale.min, scale.max + 1) %}
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="radio"
+                         name="{{ cat }}"
+                         id="{{ cat }}_{{ essay.id }}_{{ v }}"
+                         value="{{ v }}"
+                         {% if gs_val is not none and gs_val == v %}checked{% endif %}
+                         required>
+                  <label class="form-check-label" for="{{ cat }}_{{ essay.id }}_{{ v }}">
+                    <span class="fw-bold">{{ v }}</span>
+                    <span class="text-muted small d-block" style="line-height:1.1;">{{ scale.labels[v] }}</span>
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+
+            <hr class="my-3">
+
+            <!-- Difficulty statistics -->
+            <h6 class="fw-semibold mb-1">
+              <i class="bi bi-graph-up me-2 text-muted"></i>Scoring Difficulty Statistics
+              <span class="badge bg-light text-muted border ms-2" style="font-size:.72rem;">optional</span>
+            </h6>
+            <p class="text-muted small mb-3">
+              Enter observed variance and standard deviation across rater scores to track how difficult this sample was to score consistently.
+            </p>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Variance</label>
+                <input type="number" name="score_variance" class="form-control"
+                       step="0.001" min="0"
+                       placeholder="e.g. 4.25"
+                       value="{{ gs.score_variance if gs and gs.score_variance is not none else '' }}">
+                <div class="form-text">Standard variance of rater total scores for this sample.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label fw-semibold">Standard Deviation</label>
+                <input type="number" name="score_std_dev" class="form-control"
+                       step="0.001" min="0"
+                       placeholder="e.g. 2.06"
+                       value="{{ gs.score_std_dev if gs and gs.score_std_dev is not none else '' }}">
+                <div class="form-text">Standard deviation of rater total scores for this sample.</div>
+              </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2 align-items-center">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi bi-floppy me-2"></i>Save standardized score
+              </button>
+              {% if gs %}
+              {% set gs_total = (gs.task_req or 0) + (gs.argument or 0) + (gs.support or 0) + (gs.language or 0) + (gs.readability or 0) + (gs.formatting or 0) %}
+              <span class="text-muted small">
+                Current total: <strong>{{ gs_total }} / 22</strong>
+                {% if gs.score_variance is not none %}
+                &bull; Var: {{ gs.score_variance }}
+                {% endif %}
+                {% if gs.score_std_dev is not none %}
+                &bull; SD: {{ gs.score_std_dev }}
+                {% endif %}
+              </span>
+              {% endif %}
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Summary table -->
+<div class="card mt-4">
+  <div class="card-header-brand">All Standardized Scores</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>#</th>
+            <th>Title</th>
+            {% for cat in categories %}
+            <th class="text-center small">{{ category_labels[cat] }}</th>
+            {% endfor %}
+            <th class="text-center">Total</th>
+            <th class="text-center">Variance</th>
+            <th class="text-center">Std Dev</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for essay in essays %}
+          {% set gs = gold_standards.get(essay.id) %}
+          <tr class="{{ 'table-success' if gs else '' }}">
+            <td><span class="badge bg-secondary">{{ essay.essay_number }}</span></td>
+            <td>{{ essay.title }}</td>
+            {% for cat in categories %}
+            <td class="text-center">{{ gs[cat] if gs else '—' }}</td>
+            {% endfor %}
+            <td class="text-center fw-bold">
+              {% if gs %}
+              {{ (gs.task_req or 0) + (gs.argument or 0) + (gs.support or 0) + (gs.language or 0) + (gs.readability or 0) + (gs.formatting or 0) }}
+              {% else %}—{% endif %}
+            </td>
+            <td class="text-center">{{ gs.score_variance if gs and gs.score_variance is not none else '—' }}</td>
+            <td class="text-center">{{ gs.score_std_dev if gs and gs.score_std_dev is not none else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showEssay(id) {
+  document.querySelectorAll('[id^="form-"]').forEach(el => el.classList.add('d-none'));
+  document.getElementById('noSelection').classList.add('d-none');
+  document.getElementById('form-' + id).classList.remove('d-none');
+
+  // Highlight active list item
+  document.querySelectorAll('#sampleList a').forEach(a => a.classList.remove('active'));
+  document.querySelector('[data-essay-id="' + id + '"]').classList.add('active');
+}
+
+// Auto-open if only one essay
+{% if essays | length == 1 %}
+showEssay({{ essays[0].id }});
+{% endif %}
+</script>
+{% endblock %}

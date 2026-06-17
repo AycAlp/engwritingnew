@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — ENG 101{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0">Admin Dashboard</h4>
+    <p class="text-muted mb-0">ENG 101 Writing Standardization</p>
+  </div>
+  <a href="{{ url_for('export_excel') }}" class="btn btn-success btn-sm">
+    <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+  </a>
+</div>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="fs-2 fw-bold text-primary">{{ total_essays }}</div>
+      <div class="small text-muted">Samples</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="fs-2 fw-bold text-primary">{{ instructors | length }}</div>
+      <div class="small text-muted">Instructors</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      {% set total_possible = total_essays * (instructors | length) %}
+      {% set total_done = submission_counts.values() | sum %}
+      <div class="fs-2 fw-bold text-success">{{ total_done }}</div>
+      <div class="small text-muted">Scores submitted</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      {% if total_possible > 0 %}
+      <div class="fs-2 fw-bold text-warning">{{ ((total_done / total_possible) * 100) | int }}%</div>
+      {% else %}
+      <div class="fs-2 fw-bold text-muted">—</div>
+      {% endif %}
+      <div class="small text-muted">Completion</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Phase control -->
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header-brand">Session Mode</div>
+      <div class="card-body">
+        <p class="text-muted small mb-3">Control what instructors can access.</p>
+        {% for key, label in phases.items() %}
+        <form method="post" action="{{ url_for('admin_set_phase') }}" class="mb-2">
+          <input type="hidden" name="phase" value="{{ key }}">
+          <button type="submit"
+                  class="btn w-100 text-start {% if phase == key %}btn-primary fw-bold{% else %}btn-outline-secondary{% endif %}">
+            {% if key == 'data_collection' %}<i class="bi bi-pencil-fill me-2"></i>
+            {% elif key == 'analysis' %}<i class="bi bi-graph-up me-2"></i>
+            {% else %}<i class="bi bi-clipboard-data me-2"></i>{% endif %}
+            {{ label }}
+            {% if phase == key %}<span class="badge bg-white text-primary ms-2">Active</span>{% endif %}
+          </button>
+        </form>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Instructor progress -->
+  <div class="col-12 col-md-6">
+    <div class="card h-100">
+      <div class="card-header-brand">Instructor Progress</div>
+      <div class="card-body p-0">
+        {% if instructors %}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Instructor</th>
+                <th class="text-center">Scored</th>
+                <th class="text-center">Done?</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for instr in instructors %}
+              {% set done = submission_counts.get(instr.id, 0) %}
+              <tr>
+                <td>{{ instr.name }}</td>
+                <td class="text-center">{{ done }} / {{ total_essays }}</td>
+                <td class="text-center">
+                  {% if done >= total_essays and total_essays > 0 %}
+                  <i class="bi bi-check-circle-fill text-success"></i>
+                  {% else %}
+                  <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="p-4 text-center text-muted small">No instructors added yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick links -->
+<div class="row g-3 mt-2">
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('admin_essays') }}" class="card text-decoration-none text-dark text-center p-3 hover-shadow">
+      <i class="bi bi-file-text fs-3 text-primary"></i>
+      <div class="small mt-1 fw-semibold">Manage Samples</div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('admin_gold_standard') }}" class="card text-decoration-none text-dark text-center p-3">
+      <i class="bi bi-check2-circle fs-3 text-success"></i>
+      <div class="small mt-1 fw-semibold">Standardized Scores</div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('admin_sample_analysis') }}" class="card text-decoration-none text-dark text-center p-3">
+      <i class="bi bi-bar-chart fs-3 text-warning"></i>
+      <div class="small mt-1 fw-semibold">Sample Analysis</div>
+    </a>
+  </div>
+  <div class="col-6 col-md-3">
+    <a href="{{ url_for('admin_instructors') }}" class="card text-decoration-none text-dark text-center p-3">
+      <i class="bi bi-people fs-3 text-info"></i>
+      <div class="small mt-1 fw-semibold">Instructors</div>
+    </a>
+  </div>
+</div>
+{% endblock %}

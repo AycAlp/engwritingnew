@@ -1,0 +1,554 @@
+{% extends "base.html" %}
+{% block title %}Manage Samples — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Writing Samples</h4>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addEssayModal">
+      <i class="bi bi-plus-lg me-1"></i>Add Sample
+    </button>
+    <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#bulkZipModal">
+      <i class="bi bi-archive me-1"></i>Bulk ZIP
+    </button>
+  </div>
+</div>
+
+<!-- Bulk action bar (appears when samples are checked) -->
+<div id="bulkBar" class="d-none position-sticky top-0 bg-white border rounded shadow-sm p-2 mb-3 d-flex align-items-center gap-2 flex-wrap" style="z-index:100;">
+  <span class="fw-semibold text-primary small" id="bulkCount">0 selected</span>
+  <div class="vr"></div>
+  <form method="post" action="{{ url_for('admin_bulk_assign_essays') }}" id="bulkAssignForm" class="d-flex align-items-center gap-2 flex-wrap">
+    <input type="hidden" name="assign_action" id="bulkAssignAction" value="existing">
+    <div id="bulkIdsContainer"></div>
+    <select name="standardization_id" id="bulkStdSelect" class="form-select form-select-sm" style="width:220px;">
+      <option value="">— choose standardization —</option>
+      {% for std in standardizations %}
+      <option value="{{ std.id }}">{{ std.name }} ({{ std.year }}){% if std.status == 'archived' %} [archived]{% endif %}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-primary btn-sm" onclick="return prepBulkAssign('existing')">
+      <i class="bi bi-folder-symlink me-1"></i>Assign to group
+    </button>
+    <span class="text-muted small">or</span>
+    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newGroupModal">
+      <i class="bi bi-plus-lg me-1"></i>New group
+    </button>
+  </form>
+  <button class="btn btn-outline-secondary btn-sm ms-auto" onclick="clearAllChecks()">
+    <i class="bi bi-x-lg"></i>
+  </button>
+</div>
+
+{% if essays %}
+<form id="bulkFormHelper" method="post" action="{{ url_for('admin_bulk_assign_essays') }}">
+  <input type="hidden" name="assign_action" value="new">
+  <div id="bulkIdsNew"></div>
+  <input type="hidden" name="new_name" id="newGroupName">
+  <input type="hidden" name="new_year" id="newGroupYear">
+  <input type="hidden" name="new_term" id="newGroupTerm">
+  <input type="hidden" name="new_reading_task" id="newGroupTask">
+</form>
+
+<div class="row g-3">
+  {% for essay in essays %}
+  {% set imgs = essay_images.get(essay.id, []) %}
+  <div class="col-12">
+    <div class="card essay-card" data-essay-id="{{ essay.id }}">
+      <div class="card-body p-3">
+        <div class="row g-3 align-items-start">
+
+          <!-- Checkbox -->
+          <div class="col-auto d-flex align-items-center ps-3">
+            <input type="checkbox" class="essay-checkbox form-check-input mt-0"
+                   value="{{ essay.id }}" onchange="updateBulkBar()">
+          </div>
+
+          <!-- Thumbnail -->
+          <div class="col-auto d-none d-md-block">
+            {% if imgs %}
+            {% set first = imgs[0] %}
+            {% set ext = first.filename.rsplit('.', 1)[-1].lower() %}
+            {% if ext == 'pdf' %}
+            <div class="bg-light border rounded d-flex align-items-center justify-content-center"
+                 style="width:70px;height:90px;">
+              <i class="bi bi-file-earmark-pdf fs-2 text-danger"></i>
+            </div>
+            {% else %}
+            <img src="{{ url_for('essay_image', filename=first.filename) }}"
+                 class="rounded border"
+                 style="width:70px;height:90px;object-fit:cover;"
+                 alt="Sample {{ essay.essay_number }}">
+            {% endif %}
+            {% else %}
+            <div class="bg-light border rounded d-flex align-items-center justify-content-center"
+                 style="width:70px;height:90px;">
+              <i class="bi bi-image text-muted fs-2"></i>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- Info -->
+          <div class="col">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+              <span class="badge bg-secondary">#{{ essay.essay_number }}</span>
+              <strong>{{ essay.title }}</strong>
+              {% if essay.system_id %}<span class="badge bg-light text-muted border">{{ essay.system_id }}</span>{% endif %}
+              {% if essay.author_tag %}<span class="badge bg-light text-dark border"><i class="bi bi-person me-1"></i>{{ essay.author_tag }}</span>{% endif %}
+              {% if essay.reading_filename %}
+              <span class="badge bg-info text-white"><i class="bi bi-book me-1"></i>Reading attached</span>
+              {% endif %}
+            </div>
+
+            {% if essay.task_question %}
+            <p class="mb-1 small text-muted">
+              <i class="bi bi-question-circle me-1"></i><strong>Task:</strong> {{ essay.task_question }}
+            </p>
+            {% endif %}
+
+            {% if essay.notes %}
+            <p class="mb-1 small text-muted">{{ essay.notes }}</p>
+            {% endif %}
+
+            <div class="small text-muted">
+              {{ imgs | length }} file{{ 's' if imgs | length != 1 else '' }} attached
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="col-auto d-flex flex-column gap-2 align-items-end">
+
+            <!-- Edit -->
+            <button class="btn btn-outline-secondary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#editEssayModal{{ essay.id }}">
+              <i class="bi bi-pencil me-1"></i>Edit
+            </button>
+
+            <!-- Reading file -->
+            <button class="btn btn-outline-info btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#readingModal{{ essay.id }}">
+              <i class="bi bi-book me-1"></i>Reading
+            </button>
+
+            <!-- Add image -->
+            <button class="btn btn-outline-primary btn-sm"
+                    data-bs-toggle="modal"
+                    data-bs-target="#addImageModal{{ essay.id }}">
+              <i class="bi bi-image me-1"></i>Pages
+            </button>
+
+            <!-- Delete -->
+            <form method="post" action="{{ url_for('delete_essay', essay_id=essay.id) }}"
+                  onsubmit="return confirm('Delete sample #{{ essay.essay_number }} and all its data?')">
+              <button type="submit" class="btn btn-outline-danger btn-sm">
+                <i class="bi bi-trash me-1"></i>Delete
+              </button>
+            </form>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── Edit Essay Modal ─────────────────────────────────────── -->
+  <div class="modal fade" id="editEssayModal{{ essay.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Sample #{{ essay.essay_number }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <form method="post" action="{{ url_for('edit_essay', essay_id=essay.id) }}">
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-3">
+                <label class="form-label">Essay #</label>
+                <input type="number" name="essay_number" class="form-control"
+                       value="{{ essay.essay_number }}" required>
+              </div>
+              <div class="col-md-9">
+                <label class="form-label">Title</label>
+                <input type="text" name="title" class="form-control"
+                       value="{{ essay.title }}" required>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Writing Task / Prompt</label>
+                <textarea name="task_question" class="form-control" rows="2"
+                          placeholder="What was the student asked to write about?">{{ essay.task_question or '' }}</textarea>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Author Tag</label>
+                <input type="text" name="author_tag" class="form-control"
+                       value="{{ essay.author_tag or '' }}">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Source Instructor Bilkent ID</label>
+                <input type="text" name="source_instructor_bilkent_id" class="form-control"
+                       value="{{ essay.source_instructor_bilkent_id or '' }}">
+              </div>
+              <div class="col-12">
+                <label class="form-label">Notes (admin only)</label>
+                <textarea name="notes" class="form-control" rows="2">{{ essay.notes or '' }}</textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── Reading File Modal ───────────────────────────────────── -->
+  <div class="modal fade" id="readingModal{{ essay.id }}" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-book me-2"></i>Assigned Reading — Sample #{{ essay.essay_number }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% if essay.reading_filename %}
+          <div class="alert alert-info d-flex gap-2 align-items-center">
+            <i class="bi bi-file-earmark-check fs-5"></i>
+            <div>
+              <strong>Reading attached.</strong>
+              <a href="{{ url_for('essay_reading', filename=essay.reading_filename) }}"
+                 target="_blank" class="ms-2">Open file <i class="bi bi-box-arrow-up-right"></i></a>
+            </div>
+          </div>
+          <form method="post" action="{{ url_for('delete_essay_reading', essay_id=essay.id) }}"
+                class="mb-3"
+                onsubmit="return confirm('Remove the assigned reading for this sample?')">
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+              <i class="bi bi-trash me-1"></i>Remove reading
+            </button>
+          </form>
+          <hr>
+          <p class="small text-muted">Upload a replacement:</p>
+          {% else %}
+          <p class="text-muted small mb-3">
+            Upload the assigned reading so instructors can refer to it while scoring this sample.
+            Accepted formats: PDF, DOC, DOCX, TXT, image files.
+          </p>
+          {% endif %}
+
+          <form method="post"
+                action="{{ url_for('upload_essay_reading', essay_id=essay.id) }}"
+                enctype="multipart/form-data">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Select reading file</label>
+              <input type="file" name="reading_file" class="form-control"
+                     accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="bi bi-upload me-2"></i>Upload reading
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── Add Image / Pages Modal ─────────────────────────────── -->
+  <div class="modal fade" id="addImageModal{{ essay.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Pages — Sample #{{ essay.essay_number }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          {% if imgs %}
+          <h6 class="fw-semibold mb-2">Current pages</h6>
+          <div class="row g-2 mb-4">
+            {% for img in imgs %}
+            <div class="col-auto text-center">
+              {% set ext = img.filename.rsplit('.', 1)[-1].lower() %}
+              {% if ext == 'pdf' %}
+              <div class="border rounded p-2 bg-light" style="width:80px;">
+                <i class="bi bi-file-earmark-pdf fs-3 text-danger"></i>
+                <div class="small">p.{{ img.page_number }}</div>
+              </div>
+              {% else %}
+              <img src="{{ url_for('essay_image', filename=img.filename) }}"
+                   style="width:80px;height:100px;object-fit:cover;"
+                   class="border rounded" alt="Page {{ img.page_number }}">
+              {% endif %}
+              <form method="post"
+                    action="{{ url_for('delete_essay_image', essay_id=essay.id, image_id=img.id) }}"
+                    class="mt-1"
+                    onsubmit="return confirm('Remove page {{ img.page_number }}?')">
+                <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" style="font-size:.7rem;">
+                  <i class="bi bi-x"></i> Remove
+                </button>
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+
+          <h6 class="fw-semibold mb-2">Add pages</h6>
+          <form method="post"
+                action="{{ url_for('add_essay_image', essay_id=essay.id) }}"
+                enctype="multipart/form-data">
+            <input type="file" name="images" class="form-control mb-2"
+                   accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
+                   multiple required>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-upload me-1"></i>Upload pages
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-folder2-open fs-1"></i>
+    <p class="mt-3">No samples added yet. Click <strong>Add Sample</strong> to get started.</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- New Group Modal (for bulk assign) -->
+<div class="modal fade" id="newGroupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-folder-plus me-2"></i>Create New Standardization</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+          <input type="text" id="ngName" class="form-control" placeholder="e.g. Fall 2026 ENG 101" required>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col">
+            <label class="form-label fw-semibold">Year <span class="text-danger">*</span></label>
+            <input type="number" id="ngYear" class="form-control" value="{{ now_year }}" min="2000" max="2100">
+          </div>
+          <div class="col">
+            <label class="form-label fw-semibold">Term</label>
+            <select id="ngTerm" class="form-select">
+              <option value="">— select —</option>
+              <option>Fall</option>
+              <option>Spring</option>
+              <option>Summer</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-1">
+          <label class="form-label fw-semibold">Reading Task / Prompt</label>
+          <textarea id="ngTask" class="form-control" rows="2" placeholder="Optional…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitNewGroup()">
+          Create &amp; Assign Selected
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateBulkBar() {
+  const cbs = document.querySelectorAll('.essay-checkbox:checked');
+  const bar = document.getElementById('bulkBar');
+  document.getElementById('bulkCount').textContent = cbs.length + ' selected';
+  if (cbs.length > 0) {
+    bar.classList.remove('d-none');
+    bar.classList.add('d-flex');
+  } else {
+    bar.classList.add('d-none');
+    bar.classList.remove('d-flex');
+  }
+}
+function clearAllChecks() {
+  document.querySelectorAll('.essay-checkbox').forEach(cb => cb.checked = false);
+  updateBulkBar();
+}
+function getCheckedIds() {
+  return Array.from(document.querySelectorAll('.essay-checkbox:checked')).map(cb => cb.value);
+}
+function prepBulkAssign(action) {
+  const ids = getCheckedIds();
+  if (ids.length === 0) { alert('Select at least one sample.'); return false; }
+  if (action === 'existing' && !document.getElementById('bulkStdSelect').value) {
+    alert('Please choose a standardization from the dropdown.'); return false;
+  }
+  const container = document.getElementById('bulkIdsContainer');
+  container.innerHTML = '';
+  ids.forEach(id => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'essay_ids'; inp.value = id;
+    container.appendChild(inp);
+  });
+  document.getElementById('bulkAssignAction').value = action;
+  return true;
+}
+function submitNewGroup() {
+  const name = document.getElementById('ngName').value.trim();
+  const year = document.getElementById('ngYear').value.trim();
+  if (!name || !year) { alert('Name and year are required.'); return; }
+  const ids = getCheckedIds();
+  if (ids.length === 0) { alert('Select at least one sample.'); return; }
+  document.getElementById('newGroupName').value = name;
+  document.getElementById('newGroupYear').value = year;
+  document.getElementById('newGroupTerm').value = document.getElementById('ngTerm').value;
+  document.getElementById('newGroupTask').value = document.getElementById('ngTask').value;
+  const container = document.getElementById('bulkIdsNew');
+  container.innerHTML = '';
+  ids.forEach(id => {
+    const inp = document.createElement('input');
+    inp.type = 'hidden'; inp.name = 'essay_ids'; inp.value = id;
+    container.appendChild(inp);
+  });
+  document.getElementById('bulkFormHelper').submit();
+}
+</script>
+
+
+<!-- ── Add Essay Modal ──────────────────────────────────────────── -->
+<div class="modal fade" id="addEssayModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Add Writing Sample</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" enctype="multipart/form-data">
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label fw-semibold">Essay # <span class="text-danger">*</span></label>
+              <input type="number" name="essay_number" class="form-control" required min="1">
+            </div>
+            <div class="col-md-9">
+              <label class="form-label fw-semibold">Title <span class="text-danger">*</span></label>
+              <input type="text" name="title" class="form-control" required
+                     placeholder="e.g. Sample 1">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Writing Task / Prompt</label>
+              <textarea name="task_question" class="form-control" rows="2"
+                        placeholder="What was the student asked to write about? This will be shown to instructors while scoring."></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">
+                Essay Images / PDF <span class="text-danger">*</span>
+              </label>
+              <input type="file" name="images" class="form-control"
+                     accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
+                     multiple required>
+              <div class="form-text">Upload one or more image files or a PDF.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Assigned Reading (optional)</label>
+              <input type="file" name="reading_file" class="form-control"
+                     accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png">
+              <div class="form-text">PDF, DOC, DOCX, TXT or image. Shown to instructors while scoring.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Author Tag <span class="text-muted">(auto-generated if blank)</span></label>
+              <input type="text" name="author_tag" class="form-control"
+                     placeholder="Leave blank for random pseudonym">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Source Instructor Bilkent ID</label>
+              <select name="source_instructor_bilkent_id" class="form-select">
+                <option value="">— None —</option>
+                {% for instr in instructors %}
+                {% if instr.bilkent_id %}
+                <option value="{{ instr.bilkent_id }}">{{ instr.name }} ({{ instr.bilkent_id }})</option>
+                {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Standardization</label>
+              <select name="standardization_id" class="form-select">
+                <option value="">— None —</option>
+                {% for std in standardizations %}
+                <option value="{{ std.id }}"
+                  {% if std.status == 'active' and loop.first %}selected{% endif %}>
+                  {{ std.name }} ({{ std.year }})
+                  {% if std.status == 'archived' %} [archived]{% endif %}
+                </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Notes (admin only)</label>
+              <textarea name="notes" class="form-control" rows="2"
+                        placeholder="Internal notes — not shown to instructors"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-upload me-1"></i>Add sample
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Bulk ZIP Modal ───────────────────────────────────────────── -->
+<div class="modal fade" id="bulkZipModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-archive me-2"></i>Bulk ZIP Upload</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{{ url_for('admin_bulk_zip') }}" enctype="multipart/form-data">
+        <div class="modal-body">
+          <p class="small text-muted mb-3">
+            Upload a ZIP of PDF files. Filename convention:
+            <code>AuthorTag_InstructorBilkentID.pdf</code><br>
+            e.g. <code>Sener-Chaplin_B12345.pdf</code> → author "Sener Chaplin", source instructor B12345.<br>
+            Hyphens in the author name become spaces.
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Standardization</label>
+            <select name="standardization_id" class="form-select">
+              <option value="">— None —</option>
+              {% for std in standardizations %}
+              <option value="{{ std.id }}"
+                {% if std.status == 'active' and loop.first %}selected{% endif %}>
+                {{ std.name }} ({{ std.year }})
+                {% if std.status == 'archived' %} [archived]{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <input type="file" name="zipfile" class="form-control" accept=".zip" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Upload ZIP</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

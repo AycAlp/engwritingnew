@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — ENG 101{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-8 col-lg-6">
+
+    <h4 class="fw-bold mb-1">Welcome, {{ session.user_name }}</h4>
+    <p class="text-muted mb-4">ENG 101 Writing Standardization Session</p>
+
+    {% if phase == 'data_collection' %}
+
+      {% if all_done %}
+      <!-- All done -->
+      <div class="card border-success mb-4">
+        <div class="card-body text-center py-5">
+          <i class="bi bi-check-circle-fill text-success" style="font-size:3rem;"></i>
+          <h5 class="mt-3 fw-bold">You have scored all your samples.</h5>
+          <p class="text-muted">Results will be available once all scoring is complete or the admin opens the reporting phase.</p>
+        </div>
+      </div>
+
+      {% elif total_assigned == 0 %}
+      <!-- No essays yet -->
+      <div class="card mb-4">
+        <div class="card-body text-center py-5">
+          <i class="bi bi-hourglass-split text-muted" style="font-size:3rem;"></i>
+          <h5 class="mt-3">No samples assigned yet.</h5>
+          <p class="text-muted">Your administrator will add samples soon. Please check back later.</p>
+        </div>
+      </div>
+
+      {% else %}
+      <!-- Progress card -->
+      <div class="card mb-4">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-semibold">Your progress</span>
+            <span class="badge bg-secondary">{{ done }} / {{ total_assigned }} samples</span>
+          </div>
+          <div class="progress mb-4" style="height:10px; border-radius:5px;">
+            <div class="progress-bar bg-brand"
+                 style="width:{{ (done / total_assigned * 100)|int }}%"
+                 role="progressbar"
+                 aria-valuenow="{{ done }}"
+                 aria-valuemin="0" aria-valuemax="{{ total_assigned }}">
+            </div>
+          </div>
+
+          <div class="d-grid">
+            <a href="{{ url_for('mark_essay', essay_id=next_essay_id) }}"
+               class="btn btn-lg btn-accent py-3">
+              <i class="bi bi-pencil-fill me-2"></i>
+              {% if done == 0 %}Start scoring{% else %}Continue scoring{% endif %}
+              &nbsp;— Sample {{ done + 1 }} of {{ total_assigned }}
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-light border-0">
+        <div class="card-body py-3 px-4 small text-muted">
+          <i class="bi bi-info-circle me-2"></i>
+          Score the samples in order. You cannot go back and edit a submitted score. Take your time reading each sample before scoring.
+        </div>
+      </div>
+      {% endif %}
+
+    {% elif phase == 'analysis' %}
+    <div class="card mb-4">
+      <div class="card-body text-center py-5">
+        <i class="bi bi-graph-up text-primary" style="font-size:3rem;"></i>
+        <h5 class="mt-3 fw-bold">Scoring is closed</h5>
+        <p class="text-muted">The session is currently in analysis mode. Your results will be available shortly.</p>
+      </div>
+    </div>
+
+    {% elif phase == 'reporting' %}
+    <div class="card mb-4">
+      <div class="card-body text-center py-4">
+        <i class="bi bi-clipboard-data text-success" style="font-size:2.5rem;"></i>
+        <h5 class="mt-3 fw-bold">Results available</h5>
+        <p class="text-muted mb-3">The reporting phase is open. View your scoring results below.</p>
+        <a href="{{ url_for('instructor_results') }}" class="btn btn-accent">
+          <i class="bi bi-bar-chart me-2"></i>View my results
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
